@@ -42,7 +42,9 @@ with col2:
 # LOAD DATA
 # ============================================================
 
-df = pd.read_csv("clean_online_retail.csv")
+import pandas as pd
+
+df = pd.read_csv("clean_online_retail.zip", compression="zip")
 
 df.columns = df.columns.str.strip()
 
