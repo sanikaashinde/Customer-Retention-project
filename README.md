@@ -144,7 +144,7 @@ The generated insights help businesses improve customer retention and decision-m
 Clone the repository:
 
 ```bash
-git clone <repository-link>
+git clone <https://github.com/sanikaashinde/Customer-Retention-project>
 ```
 
 Install dependencies:
