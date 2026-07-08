@@ -1,136 +1,243 @@
+from pathlib import Path
 import streamlit as st
-import joblib
 import pandas as pd
-from datetime import datetime
+import joblib
+import sqlite3
 
-# Load model
-model = joblib.load("../ml/model.pkl")
-scaler = joblib.load("../ml/scaler.pkl")
+# =====================================================
+# PAGE CONFIG
+# =====================================================
 
-# Load customer data
-rfm = pd.read_csv("../data/customer_rfm_segments.csv")
+st.set_page_config(
+    page_title="Customer Churn Prediction",
+    page_icon="🤖",
+    layout="wide"
+)
 
 st.title("🤖 Customer Churn Prediction")
 
-st.caption(
-    f"Prediction Time: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}"
+st.write(
+    "Select a customer and predict whether the customer is likely to churn."
 )
 
-st.write("Enter Customer ID to predict churn.")
+# =====================================================
+# PATHS
+# =====================================================
 
-customer_id = st.number_input(
-    "Customer ID",
-    min_value=0.0,
-    step=1.0
+BASE_DIR = Path(__file__).resolve().parents[2]
+
+DATA_PATH = BASE_DIR / "data" / "churn.csv"
+MODEL_PATH = BASE_DIR / "ml" / "model.pkl"
+SCALER_PATH = BASE_DIR / "ml" / "scaler.pkl"
+ENCODER_PATH = BASE_DIR / "ml" / "encoders.pkl"
+DB_PATH = BASE_DIR / "database" / "customer.db"
+
+# =====================================================
+# LOAD FILES
+# =====================================================
+
+@st.cache_resource
+def load_model():
+    model = joblib.load(MODEL_PATH)
+    scaler = joblib.load(SCALER_PATH)
+    encoders = joblib.load(ENCODER_PATH)
+    return model, scaler, encoders
+
+
+@st.cache_data
+def load_data():
+    return pd.read_csv(DATA_PATH)
+
+
+model, scaler, encoders = load_model()
+df = load_data()
+
+# =====================================================
+# CUSTOMER SELECTION
+# =====================================================
+
+customer_id = st.selectbox(
+    "Select Customer ID",
+    sorted(df["customerID"].tolist())
 )
 
-if st.button("Predict Customer Churn"):
+customer = df[df["customerID"] == customer_id].iloc[0]
 
-    customer = rfm[
-        rfm["Customer ID"] == customer_id
-    ]
+# =====================================================
+# CUSTOMER DETAILS
+# =====================================================
 
-    if customer.empty:
+st.subheader("👤 Customer Details")
 
-        st.error("Customer ID not found.")
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.metric("Customer ID", customer["customerID"])
+    st.metric("Gender", customer["gender"])
+
+with col2:
+    st.metric("Tenure", customer["tenure"])
+    st.metric("Contract", customer["Contract"])
+
+with col3:
+    st.metric("Monthly Charges", f"₹{customer['MonthlyCharges']}")
+    st.metric("Total Charges", f"₹{customer['TotalCharges']}")
+
+st.markdown("---")
+
+# =====================================================
+# PREDICT BUTTON
+# =====================================================
+
+if st.button("🚀 Predict Churn", use_container_width=True):
+
+    input_df = customer.to_frame().T.copy()
+
+    input_df.drop(
+        columns=["customerID", "Churn"],
+        inplace=True
+    )
+
+    input_df["TotalCharges"] = pd.to_numeric(
+        input_df["TotalCharges"],
+        errors="coerce"
+    )
+
+    input_df["TotalCharges"] = input_df["TotalCharges"].fillna(
+        input_df["TotalCharges"].median()
+    )
+
+    # Encode categorical columns
+    for col, encoder in encoders.items():
+
+        if col in input_df.columns:
+
+            input_df[col] = encoder.transform(
+                input_df[col]
+            )
+
+    # Scale
+    input_scaled = scaler.transform(input_df)
+
+    # Prediction
+    prediction = model.predict(input_scaled)[0]
+
+    probability = model.predict_proba(
+        input_scaled
+    )[0][1]
+
+    # =====================================================
+    # Risk Level
+    # =====================================================
+
+    if probability >= 0.80:
+        risk = "High"
+
+    elif probability >= 0.50:
+        risk = "Medium"
+
+    else:
+        risk = "Low"
+
+    # =====================================================
+    # SAVE TO DATABASE
+    # =====================================================
+
+    conn = sqlite3.connect(DB_PATH)
+
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS predictions(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customerID TEXT,
+        prediction TEXT,
+        probability REAL,
+        risk TEXT,
+        prediction_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cursor.execute(
+        """
+        INSERT INTO predictions
+        (customerID,prediction,probability,risk)
+        VALUES (?,?,?,?)
+        """,
+        (
+            customer_id,
+            "Churn" if prediction == 1 else "No Churn",
+            float(probability),
+            risk
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    # =====================================================
+    # RESULT
+    # =====================================================
+
+    st.subheader("📈 Prediction Result")
+
+    st.metric(
+        "Churn Probability",
+        f"{probability*100:.2f}%"
+    )
+
+    st.progress(float(probability))
+
+    if prediction == 1:
+        st.error("❌ Customer Will Churn")
+
+    else:
+        st.success("✅ Customer Will Stay")
+
+    # =====================================================
+    # RISK ANALYSIS
+    # =====================================================
+
+    st.markdown("---")
+
+    st.subheader("⚠️ Risk Analysis")
+
+    if risk == "High":
+
+        st.error("🔴 High Risk Customer")
+
+        st.warning(
+            "Recommendation: Offer discounts, loyalty rewards and retention campaigns immediately."
+        )
+
+    elif risk == "Medium":
+
+        st.warning("🟠 Medium Risk Customer")
+
+        st.info(
+            "Recommendation: Send promotional offers and follow-up communication."
+        )
 
     else:
 
-        recency = customer.iloc[0]["Recency"]
-        frequency = customer.iloc[0]["Frequency"]
-        monetary = customer.iloc[0]["Monetary"]
-        segment = customer.iloc[0]["Segment"]
+        st.success("🟢 Low Risk Customer")
 
-        input_data = pd.DataFrame(
-            [[recency, frequency, monetary]],
-            columns=[
-                "Recency",
-                "Frequency",
-                "Monetary"
-            ]
+        st.info(
+            "Recommendation: Customer is loyal. Continue regular engagement."
         )
 
-        scaled_data = scaler.transform(input_data)
+    # =====================================================
+    # ACTUAL LABEL
+    # =====================================================
 
-        prediction = model.predict(scaled_data)[0]
+    st.markdown("---")
 
-        probability = model.predict_proba(
-            scaled_data
-        )[0][1]
+    st.subheader("📋 Actual Dataset Label")
 
-        st.subheader("Customer Details")
+    if customer["Churn"] == "Yes":
 
-        st.write("Customer ID:", int(customer_id))
-        st.write("Segment:", segment)
+        st.error("Actual Label : Customer Churned")
 
-        col1, col2, col3 = st.columns(3)
+    else:
 
-        with col1:
-            st.metric(
-                "Recency",
-                recency
-            )
-
-        with col2:
-            st.metric(
-                "Frequency",
-                frequency
-            )
-
-        with col3:
-            st.metric(
-                "Monetary",
-                round(monetary, 2)
-            )
-
-        st.subheader("Churn Probability")
-
-        st.progress(float(probability))
-
-        st.write(
-            f"Risk Probability: {round(probability*100,2)}%"
-        )
-
-        st.subheader("Prediction Result")
-
-        if prediction == 1:
-
-            st.error(
-                "❌ Customer Will Churn"
-            )
-
-        else:
-
-            st.success(
-                "✅ Customer Will Stay"
-            )
-
-        if probability > 0.8:
-
-            st.error(
-                "🔴 High Risk Customer"
-            )
-
-            st.warning(
-                "Recommended Action: Provide discount or retention campaign."
-            )
-
-        elif probability > 0.5:
-
-            st.warning(
-                "🟠 Medium Risk Customer"
-            )
-
-            st.info(
-                "Recommended Action: Send promotional campaign."
-            )
-
-        else:
-
-            st.success(
-                "🟢 Low Risk Customer"
-            )
-
-            st.info(
-                "Customer is loyal and active."
-            )
+        st.success("Actual Label : Customer Did Not Churn")

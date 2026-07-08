@@ -1,113 +1,181 @@
 import pandas as pd
+import numpy as np
+
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import precision_score
-from sklearn.metrics import recall_score
-from sklearn.metrics import f1_score
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import classification_report
-import joblib
+from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import StandardScaler
 
-# Dataset load
-df = pd.read_csv("data/customer_rfm_segments.csv")
+from sklearn.ensemble import RandomForestClassifier
 
-# Create Churn column
-# 1 = Customer may churn
-# 0 = Customer stays
-
-df["Churn"] = df["Segment"].apply(
-    lambda x: 1 if x in ["Lost Customers", "At Risk"] else 0
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+    classification_report
 )
 
-# Check how many customers churned or stayed
-print("Churn Distribution:")
-print(df["Churn"].value_counts())
+import joblib
 
-# Show first 5 rows
-print("\nUpdated Dataset:")
+# Load Dataset
+df = pd.read_csv("data/churn.csv")
+
+# Display first 5 rows
 print(df.head())
 
-# Features and Target
+# Display dataset shape
+print("\nDataset Shape:", df.shape)
 
-X = df[[
-    "Recency",
-    "Frequency",
-    "Monetary",
-]]
+# Dataset Information
+print("\nDataset Information:")
+print(df.info())
 
+# Missing Values
+print("\nMissing Values:")
+print(df.isnull().sum())
+
+# Data Types
+print("\nData Types:")
+print(df.dtypes)
+
+# Remove customerID column
+df.drop("customerID", axis=1, inplace=True)
+
+# Convert TotalCharges to numeric
+df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors="coerce")
+
+# Check missing values again
+print("\nMissing Values After Conversion:")
+print(df.isnull().sum())
+
+# Fill missing values with median
+df["TotalCharges"] = df["TotalCharges"].fillna(df["TotalCharges"].median())
+
+# Verify missing values are removed
+print("\nMissing Values After Filling:")
+print(df.isnull().sum())
+
+# Convert Churn column into 0 and 1
+df["Churn"] = df["Churn"].map({
+    "Yes": 1,
+    "No": 0
+})
+
+print("\nChurn Value Counts:")
+print(df["Churn"].value_counts())
+
+print("\nFirst 5 values of Churn:")
+print(df["Churn"].head())
+
+# Encode all categorical columns
+
+categorical_columns = df.select_dtypes(include=["object"]).columns
+
+encoders = {}
+
+for column in categorical_columns:
+    le = LabelEncoder()
+    df[column] = le.fit_transform(df[column])
+    encoders[column] = le
+
+print("\nData Types After Encoding:")
+print(df.dtypes)
+
+# Separate Features and Target
+
+X = df.drop("Churn", axis=1)
 y = df["Churn"]
 
-# Train-Test Split
+print("\nFeatures Shape:", X.shape)
+print("Target Shape:", y.shape)
+
+print("\nFeature Columns:")
+print(X.columns)
+
+# Split the dataset into Training and Testing sets
 
 X_train, X_test, y_train, y_test = train_test_split(
     X,
     y,
-    test_size=0.2,
+    test_size=0.20,
     random_state=42
 )
 
-print("\nTraining Data:", X_train.shape)
-print("Testing Data:", X_test.shape)
+print("\nTraining Features Shape:", X_train.shape)
+print("Testing Features Shape:", X_test.shape)
 
-# feature Scaling
+print("\nTraining Target Shape:", y_train.shape)
+print("Testing Target Shape:", y_test.shape)
+
+# Feature Scaling
 
 scaler = StandardScaler()
-X_train_scaled = scaler.fit_transform(X_train)
-X_test_scaled = scaler.transform(X_test)
 
-# Model Training
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
 
-model = RandomForestClassifier(random_state=42)
+print("\nFeature Scaling Completed Successfully!")
 
-model.fit(X_train_scaled, y_train)
+print("Training Data Shape:", X_train.shape)
+print("Testing Data Shape:", X_test.shape)
 
-print("\nModel Training Completed Successfully!")
+# -------------------------------
+# Train Random Forest Model
+# -------------------------------
 
-# Save Model
+model = RandomForestClassifier(
+    n_estimators=100,
+    random_state=42
+)
 
-joblib.dump(model, "models/churn_model.pkl")
+model.fit(X_train, y_train)
 
-import os
+print("\n✅ Model Training Completed Successfully!")
 
+# -------------------------------
+# Make Predictions
+# -------------------------------
 
-# Create ml folder if it doesn't exist
-os.makedirs("ml", exist_ok=True)
+y_pred = model.predict(X_test)
+
+# -------------------------------
+# Model Evaluation
+# -------------------------------
+
+print("\n========== MODEL PERFORMANCE ==========")
+
+print("Accuracy :", accuracy_score(y_test, y_pred))
+print("Precision:", precision_score(y_test, y_pred))
+print("Recall   :", recall_score(y_test, y_pred))
+print("F1 Score :", f1_score(y_test, y_pred))
+
+# -------------------------------
+# Confusion Matrix
+# -------------------------------
+
+cm = confusion_matrix(y_test, y_pred)
+
+print("\n========== CONFUSION MATRIX ==========")
+print(cm)
+
+# -------------------------------
+# Classification Report
+# -------------------------------
+
+print("\n========== CLASSIFICATION REPORT ==========")
+print(classification_report(y_test, y_pred))
+
+# -------------------------------
+# Save Model and Scaler
+# -------------------------------
 
 joblib.dump(model, "ml/model.pkl")
 joblib.dump(scaler, "ml/scaler.pkl")
+joblib.dump(encoders, "ml/encoders.pkl")
 
-print("Current Working Directory:", os.getcwd())
-print("Model exists:", os.path.exists("ml/model.pkl"))
-print("Scaler exists:", os.path.exists("ml/scaler.pkl"))
+print("\n✅ Model saved successfully!")
+print("✅ Scaler saved successfully!")
+print("✅ Encoders saved successfully!")
 
-print("Current Working Directory:", os.getcwd())
-print("Model exists:", os.path.exists("models/churn_model.pkl"))
-print("Scaler exists:", os.path.exists("models/scaler.pkl"))
-print("Scaler size:", os.path.getsize("models/scaler.pkl"))
-
-# Save Scaler
-joblib.dump(scaler, "models/scaler.pkl")
-
-print("\nModel Saved Successfully!")
-# Predictions
-
-y_pred = model.predict(X_test_scaled)
-
-# Evaluation Metrics
-
-print("\nAccuracy:", accuracy_score(y_test, y_pred))
-print("Precision:", precision_score(y_test, y_pred))
-print("Recall:", recall_score(y_test, y_pred))
-print("F1 Score:", f1_score(y_test, y_pred))
-
-# Confusion Matrix
-
-print("\nConfusion Matrix:")
-print(confusion_matrix(y_test, y_pred))
-
-# Classification Report
-
-print("\nClassification Report:")
-print(classification_report(y_test, y_pred))
+joblib.dump(encoders, "ml/encoders.pkl")
