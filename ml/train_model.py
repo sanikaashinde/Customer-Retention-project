@@ -1,181 +1,157 @@
+from pathlib import Path
+import streamlit as st
 import pandas as pd
-import numpy as np
-
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
-from sklearn.preprocessing import StandardScaler
-
-from sklearn.ensemble import RandomForestClassifier
-
-from sklearn.metrics import (
-    accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score,
-    confusion_matrix,
-    classification_report
-)
-
+import plotly.express as px
 import joblib
 
-# Load Dataset
-df = pd.read_csv("data/churn.csv")
+# =====================================================
+# PAGE CONFIG
+# =====================================================
 
-# Display first 5 rows
-print(df.head())
+st.set_page_config(
+    page_title="Model Performance",
+    page_icon="📈",
+    layout="wide"
+)
 
-# Display dataset shape
-print("\nDataset Shape:", df.shape)
+st.title("📈 Model Performance")
 
-# Dataset Information
-print("\nDataset Information:")
-print(df.info())
+# =====================================================
+# PATHS
+# =====================================================
 
-# Missing Values
-print("\nMissing Values:")
-print(df.isnull().sum())
+BASE_DIR = Path(__file__).resolve().parents[2]
 
-# Data Types
-print("\nData Types:")
-print(df.dtypes)
+MODEL_PATH = BASE_DIR / "ml" / "model.pkl"
+METRICS_PATH = BASE_DIR / "ml" / "metrics.pkl"
+DATA_PATH = BASE_DIR / "data" / "churn.csv"
 
-# Remove customerID column
-df.drop("customerID", axis=1, inplace=True)
+# =====================================================
+# LOAD FILES
+# =====================================================
 
-# Convert TotalCharges to numeric
-df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors="coerce")
+try:
+    model = joblib.load(MODEL_PATH)
+    metrics = joblib.load(METRICS_PATH)
+    df = pd.read_csv(DATA_PATH)
 
-# Check missing values again
-print("\nMissing Values After Conversion:")
-print(df.isnull().sum())
+except Exception as e:
+    st.error(f"Error loading files:\n\n{e}")
+    st.stop()
 
-# Fill missing values with median
-df["TotalCharges"] = df["TotalCharges"].fillna(df["TotalCharges"].median())
+# =====================================================
+# VERIFY METRICS FILE
+# =====================================================
 
-# Verify missing values are removed
-print("\nMissing Values After Filling:")
-print(df.isnull().sum())
+st.caption("Metrics loaded from ml/metrics.pkl")
 
-# Convert Churn column into 0 and 1
-df["Churn"] = df["Churn"].map({
-    "Yes": 1,
-    "No": 0
+# Uncomment this if you want to debug
+# st.write(metrics)
+
+# =====================================================
+# METRICS
+# =====================================================
+
+accuracy = metrics["accuracy"]
+precision = metrics["precision"]
+recall = metrics["recall"]
+f1 = metrics["f1"]
+cm = metrics["confusion_matrix"]
+
+st.subheader("Evaluation Metrics")
+
+col1, col2, col3, col4 = st.columns(4)
+
+col1.metric(
+    "Accuracy",
+    f"{accuracy*100:.2f}%"
+)
+
+col2.metric(
+    "Precision",
+    f"{precision*100:.2f}%"
+)
+
+col3.metric(
+    "Recall",
+    f"{recall*100:.2f}%"
+)
+
+col4.metric(
+    "F1 Score",
+    f"{f1*100:.2f}%"
+)
+
+st.markdown("---")
+
+# =====================================================
+# CONFUSION MATRIX
+# =====================================================
+
+st.subheader("Confusion Matrix")
+
+cm_df = pd.DataFrame(
+    cm,
+    index=["Actual No Churn", "Actual Churn"],
+    columns=["Predicted No Churn", "Predicted Churn"]
+)
+
+st.dataframe(
+    cm_df,
+    use_container_width=True,
+    hide_index=False
+)
+
+st.markdown("---")
+
+# =====================================================
+# FEATURE IMPORTANCE
+# =====================================================
+
+st.subheader("Feature Importance")
+
+X = df.drop(columns=["customerID", "Churn"])
+
+importance = pd.DataFrame({
+    "Feature": X.columns,
+    "Importance": model.feature_importances_
 })
 
-print("\nChurn Value Counts:")
-print(df["Churn"].value_counts())
-
-print("\nFirst 5 values of Churn:")
-print(df["Churn"].head())
-
-# Encode all categorical columns
-
-categorical_columns = df.select_dtypes(include=["object"]).columns
-
-encoders = {}
-
-for column in categorical_columns:
-    le = LabelEncoder()
-    df[column] = le.fit_transform(df[column])
-    encoders[column] = le
-
-print("\nData Types After Encoding:")
-print(df.dtypes)
-
-# Separate Features and Target
-
-X = df.drop("Churn", axis=1)
-y = df["Churn"]
-
-print("\nFeatures Shape:", X.shape)
-print("Target Shape:", y.shape)
-
-print("\nFeature Columns:")
-print(X.columns)
-
-# Split the dataset into Training and Testing sets
-
-X_train, X_test, y_train, y_test = train_test_split(
-    X,
-    y,
-    test_size=0.20,
-    random_state=42
+importance = importance.sort_values(
+    by="Importance",
+    ascending=False
 )
 
-print("\nTraining Features Shape:", X_train.shape)
-print("Testing Features Shape:", X_test.shape)
-
-print("\nTraining Target Shape:", y_train.shape)
-print("Testing Target Shape:", y_test.shape)
-
-# Feature Scaling
-
-scaler = StandardScaler()
-
-X_train = scaler.fit_transform(X_train)
-X_test = scaler.transform(X_test)
-
-print("\nFeature Scaling Completed Successfully!")
-
-print("Training Data Shape:", X_train.shape)
-print("Testing Data Shape:", X_test.shape)
-
-# -------------------------------
-# Train Random Forest Model
-# -------------------------------
-
-model = RandomForestClassifier(
-    n_estimators=100,
-    random_state=42
+fig = px.bar(
+    importance,
+    x="Importance",
+    y="Feature",
+    orientation="h",
+    title="Top Features Influencing Churn"
 )
 
-model.fit(X_train, y_train)
+fig.update_layout(
+    yaxis=dict(categoryorder="total ascending"),
+    height=600
+)
 
-print("\n✅ Model Training Completed Successfully!")
+st.plotly_chart(
+    fig,
+    use_container_width=True
+)
 
-# -------------------------------
-# Make Predictions
-# -------------------------------
+st.markdown("---")
 
-y_pred = model.predict(X_test)
+st.subheader("Feature Importance Table")
 
-# -------------------------------
-# Model Evaluation
-# -------------------------------
+importance["Importance"] = importance["Importance"].round(4)
 
-print("\n========== MODEL PERFORMANCE ==========")
+st.dataframe(
+    importance,
+    use_container_width=True,
+    hide_index=True
+)
 
-print("Accuracy :", accuracy_score(y_test, y_pred))
-print("Precision:", precision_score(y_test, y_pred))
-print("Recall   :", recall_score(y_test, y_pred))
-print("F1 Score :", f1_score(y_test, y_pred))
+st.markdown("---")
 
-# -------------------------------
-# Confusion Matrix
-# -------------------------------
-
-cm = confusion_matrix(y_test, y_pred)
-
-print("\n========== CONFUSION MATRIX ==========")
-print(cm)
-
-# -------------------------------
-# Classification Report
-# -------------------------------
-
-print("\n========== CLASSIFICATION REPORT ==========")
-print(classification_report(y_test, y_pred))
-
-# -------------------------------
-# Save Model and Scaler
-# -------------------------------
-
-joblib.dump(model, "ml/model.pkl")
-joblib.dump(scaler, "ml/scaler.pkl")
-joblib.dump(encoders, "ml/encoders.pkl")
-
-print("\n✅ Model saved successfully!")
-print("✅ Scaler saved successfully!")
-print("✅ Encoders saved successfully!")
-
-joblib.dump(encoders, "ml/encoders.pkl")
+st.success("Model performance shown above is based on the test dataset used during training.")

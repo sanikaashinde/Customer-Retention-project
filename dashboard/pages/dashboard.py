@@ -219,3 +219,74 @@ st.markdown("---")
 st.caption(
     "Customer Churn Prediction System | Streamlit + Machine Learning + Python"
 )
+
+# =====================================================
+# BUSINESS INSIGHTS
+# =====================================================
+
+st.markdown("---")
+st.header("📊 Business Insights")
+
+# Highest Churn Contract
+contract_churn = (
+    df.groupby("Contract")["Churn"]
+      .apply(lambda x: (x == "Yes").mean() * 100)
+)
+
+highest_contract = contract_churn.idxmax()
+
+# Fiber Users Churn %
+fiber_df = df[df["InternetService"] == "Fiber optic"]
+
+fiber_churn = (
+    (fiber_df["Churn"] == "Yes").mean() * 100
+)
+
+# Highest Monthly Charges among churned customers
+highest_monthly = (
+    df[df["Churn"] == "Yes"]["MonthlyCharges"].max()
+)
+
+# Most Loyal Customers
+loyal_customers = (
+    df[df["Churn"] == "No"]["tenure"].max()
+)
+
+# Top Churn Risk Group
+risk_group = (
+    df[df["Churn"] == "Yes"]
+    .groupby("Contract")
+    .size()
+    .idxmax()
+)
+
+st.success(
+    f"🔴 **Top Churn Risk Group:** Customers with **{risk_group}** contracts have the highest churn volume."
+)
+
+st.warning(
+    f"📄 **Highest Churn Contract:** **{highest_contract}** ({contract_churn.max():.1f}% churn rate)."
+)
+
+st.info(
+    f"💰 **Highest Monthly Charges (Churned Customers): ₹{highest_monthly:.2f}**"
+)
+
+st.success(
+    f"⭐ **Most Loyal Customers:** Customers staying for **{loyal_customers} months**."
+)
+
+st.error(
+    f"🌐 **Fiber Optic Users Churn Rate:** {fiber_churn:.1f}%"
+)
+
+st.markdown("---")
+st.subheader("💡 Business Recommendations")
+
+st.markdown("""
+- Retain customers on **Month-to-month contracts** with personalized offers.
+- Provide discounts for customers with **high monthly charges**.
+- Improve customer support for **Fiber optic users**.
+- Encourage long-term contracts through loyalty rewards.
+- Target high-risk customers before contract renewal.
+""")

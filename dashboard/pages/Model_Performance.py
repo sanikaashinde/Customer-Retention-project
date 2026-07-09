@@ -3,13 +3,6 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import joblib
-from sklearn.metrics import (
-    accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score,
-    confusion_matrix
-)
 
 # =====================================================
 # PAGE CONFIG
@@ -23,70 +16,62 @@ st.set_page_config(
 
 st.title("📈 Model Performance")
 
+st.write(
+    "Performance metrics of the trained Random Forest model evaluated on the test dataset."
+)
+
 # =====================================================
 # PATHS
 # =====================================================
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
-DATA_PATH = BASE_DIR / "data" / "churn.csv"
 MODEL_PATH = BASE_DIR / "ml" / "model.pkl"
-SCALER_PATH = BASE_DIR / "ml" / "scaler.pkl"
-ENCODER_PATH = BASE_DIR / "ml" / "encoders.pkl"
+METRICS_PATH = BASE_DIR / "ml" / "metrics.pkl"
+DATA_PATH = BASE_DIR / "data" / "churn.csv"
 
 # =====================================================
-# LOAD
+# LOAD FILES
 # =====================================================
-
-df = pd.read_csv(DATA_PATH)
 
 model = joblib.load(MODEL_PATH)
-scaler = joblib.load(SCALER_PATH)
-encoders = joblib.load(ENCODER_PATH)
+metrics = joblib.load(METRICS_PATH)
+df = pd.read_csv(DATA_PATH)
 
-# =====================================================
-# PREPROCESS
-# =====================================================
-
-X = df.drop(columns=["customerID", "Churn"]).copy()
-
-X["TotalCharges"] = pd.to_numeric(
-    X["TotalCharges"],
-    errors="coerce"
-)
-
-X["TotalCharges"] = X["TotalCharges"].fillna(
-    X["TotalCharges"].median()
-)
-
-for col, encoder in encoders.items():
-    if col in X.columns:
-        X[col] = encoder.transform(X[col])
-
-y = df["Churn"].map({
-    "No": 0,
-    "Yes": 1
-})
-
-X_scaled = scaler.transform(X)
-
-y_pred = model.predict(X_scaled)
+# Remove columns not used for feature importance
+X = df.drop(columns=["customerID", "Churn"])
 
 # =====================================================
 # METRICS
 # =====================================================
 
-accuracy = accuracy_score(y, y_pred)
-precision = precision_score(y, y_pred)
-recall = recall_score(y, y_pred)
-f1 = f1_score(y, y_pred)
+accuracy = metrics["accuracy"]
+precision = metrics["precision"]
+recall = metrics["recall"]
+f1 = metrics["f1"]
+cm = metrics["confusion_matrix"]
 
-c1, c2, c3, c4 = st.columns(4)
+col1, col2, col3, col4 = st.columns(4)
 
-c1.metric("Accuracy", f"{accuracy:.2%}")
-c2.metric("Precision", f"{precision:.2%}")
-c3.metric("Recall", f"{recall:.2%}")
-c4.metric("F1 Score", f"{f1:.2%}")
+col1.metric(
+    "Accuracy",
+    f"{accuracy:.2%}"
+)
+
+col2.metric(
+    "Precision",
+    f"{precision:.2%}"
+)
+
+col3.metric(
+    "Recall",
+    f"{recall:.2%}"
+)
+
+col4.metric(
+    "F1 Score",
+    f"{f1:.2%}"
+)
 
 st.markdown("---")
 
@@ -94,19 +79,18 @@ st.markdown("---")
 # CONFUSION MATRIX
 # =====================================================
 
-cm = confusion_matrix(y, y_pred)
+st.subheader("Confusion Matrix")
 
 cm_df = pd.DataFrame(
     cm,
-    index=["Actual No", "Actual Yes"],
-    columns=["Pred No", "Pred Yes"]
+    index=["Actual No Churn", "Actual Churn"],
+    columns=["Predicted No Churn", "Predicted Churn"]
 )
-
-st.subheader("Confusion Matrix")
 
 st.dataframe(
     cm_df,
-    use_container_width=True
+    use_container_width=True,
+    hide_index=False
 )
 
 st.markdown("---")
@@ -114,6 +98,8 @@ st.markdown("---")
 # =====================================================
 # FEATURE IMPORTANCE
 # =====================================================
+
+st.subheader("Feature Importance")
 
 importance = pd.DataFrame({
     "Feature": X.columns,
@@ -130,7 +116,13 @@ fig = px.bar(
     x="Importance",
     y="Feature",
     orientation="h",
-    title="Feature Importance"
+    title="Feature Importance",
+    text_auto=".3f"
+)
+
+fig.update_layout(
+    yaxis=dict(categoryorder="total ascending"),
+    height=600
 )
 
 st.plotly_chart(
@@ -140,9 +132,51 @@ st.plotly_chart(
 
 st.markdown("---")
 
+# =====================================================
+# TOP IMPORTANT FEATURES
+# =====================================================
+
 st.subheader("Top Important Features")
 
 st.dataframe(
-    importance,
-    use_container_width=True
+    importance.reset_index(drop=True),
+    use_container_width=True,
+    hide_index=True
+)
+
+st.markdown("---")
+
+# =====================================================
+# MODEL SUMMARY
+# =====================================================
+
+st.subheader("Model Summary")
+
+summary = pd.DataFrame({
+    "Metric": [
+        "Algorithm",
+        "Training Samples",
+        "Testing Samples",
+        "Number of Features",
+        "Accuracy",
+        "Precision",
+        "Recall",
+        "F1 Score"
+    ],
+    "Value": [
+        "Random Forest Classifier",
+        5634,
+        1409,
+        len(X.columns),
+        f"{accuracy:.2%}",
+        f"{precision:.2%}",
+        f"{recall:.2%}",
+        f"{f1:.2%}"
+    ]
+})
+
+st.dataframe(
+    summary,
+    use_container_width=True,
+    hide_index=True
 )
