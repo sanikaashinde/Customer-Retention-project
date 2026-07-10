@@ -203,6 +203,7 @@ pip install -r requirements.txt
 Run the Streamlit application
 
 ```bash
+python database/init_db.py
 streamlit run dashboard/app.py
 ```
 
@@ -264,4 +265,5 @@ streamlit run dashboard/app.py
 GitHub: https://github.com/sanikaashinde
 
 ---
+
 
