@@ -159,7 +159,7 @@ if st.button("🚀 Predict Churn", use_container_width=True):
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='predictions'"
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='prediction_history'"
     )
 
     table_exists = cursor.fetchone()
@@ -170,15 +170,15 @@ if st.button("🚀 Predict Churn", use_container_width=True):
 
     if table_exists:
 
-        cursor.execute("PRAGMA table_info(predictions)")
+        cursor.execute("PRAGMA table_info(prediction_history)")
         columns = [col[1] for col in cursor.fetchall()]
 
         if "customerID" not in columns:
 
-            cursor.execute("DROP TABLE predictions")
+            cursor.execute("DROP TABLE prediction_history")
 
             cursor.execute("""
-            CREATE TABLE predictions(
+            CREATE TABLE prediction_history(
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 customerID TEXT,
                 prediction TEXT,
@@ -193,7 +193,7 @@ if st.button("🚀 Predict Churn", use_container_width=True):
     else:
 
         cursor.execute("""
-        CREATE TABLE predictions(
+        CREATE TABLE prediction_history(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             customerID TEXT,
             prediction TEXT,
@@ -211,7 +211,7 @@ if st.button("🚀 Predict Churn", use_container_width=True):
 
     cursor.execute(
         """
-        INSERT INTO predictions
+        INSERT INTO prediction_history
         (customerID, prediction, probability, risk)
         VALUES (?, ?, ?, ?)
         """,

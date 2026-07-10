@@ -4,7 +4,7 @@ from sqlalchemy.orm import declarative_base
 Base = declarative_base()
 
 class CustomerPrediction(Base):
-    __tablename__ = "predictions"
+    __tablename__ = "prediction_history"
 
     id = Column(Integer, primary_key=True)
     customer_id = Column(Integer)

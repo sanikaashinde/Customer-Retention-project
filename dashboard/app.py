@@ -20,7 +20,7 @@ st.markdown("""
 This project predicts whether a telecom customer is likely to **churn (leave the service)** using a
 **Random Forest Machine Learning model** trained on the **IBM Telco Customer Churn Dataset**.
 
-The application provides customer predictions, business insights, model performance,
+The application provides Customer Churn Prediction, Prediction History, Business Insights, and Model Performance,
 and prediction history through an interactive Streamlit dashboard.
 """)
 
@@ -161,3 +161,4 @@ offers, loyalty rewards, and customer engagement strategies.
 st.markdown("---")
 
 st.success("✅ End-to-End Customer Churn Prediction System using Machine Learning and Streamlit")
+

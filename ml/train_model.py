@@ -1,116 +1,288 @@
 from pathlib import Path
-import streamlit as st
-import pandas as pd
-import plotly.express as px
 import joblib
+import pandas as pd
+import numpy as np
 
-# =====================================================
-# PAGE CONFIG
-# =====================================================
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import StandardScaler
 
-st.set_page_config(
-    page_title="Model Performance",
-    page_icon="📈",
-    layout="wide"
+from sklearn.ensemble import RandomForestClassifier
+
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    roc_auc_score,
+    confusion_matrix,
+    classification_report
 )
 
-st.title("📈 Model Performance")
-
-# =====================================================
+# =========================================================
 # PATHS
-# =====================================================
+# =========================================================
 
-BASE_DIR = Path(__file__).resolve().parents[2]
+BASE_DIR = Path(__file__).resolve().parents[1]
 
-MODEL_PATH = BASE_DIR / "ml" / "model.pkl"
-METRICS_PATH = BASE_DIR / "ml" / "metrics.pkl"
 DATA_PATH = BASE_DIR / "data" / "churn.csv"
 
-# =====================================================
-# LOAD FILES
-# =====================================================
+MODEL_PATH = BASE_DIR / "ml" / "model.pkl"
 
-try:
-    model = joblib.load(MODEL_PATH)
-    metrics = joblib.load(METRICS_PATH)
-    df = pd.read_csv(DATA_PATH)
+SCALER_PATH = BASE_DIR / "ml" / "scaler.pkl"
 
-except Exception as e:
-    st.error(f"Error loading files:\n\n{e}")
-    st.stop()
+ENCODER_PATH = BASE_DIR / "ml" / "encoders.pkl"
 
-# =====================================================
-# VERIFY METRICS FILE
-# =====================================================
+METRICS_PATH = BASE_DIR / "ml" / "metrics.pkl"
 
-st.caption("Metrics loaded from ml/metrics.pkl")
+print("=" * 60)
+print("CUSTOMER CHURN MODEL TRAINING")
+print("=" * 60)
 
-# Uncomment this if you want to debug
-# st.write(metrics)
+# =========================================================
+# LOAD DATASET
+# =========================================================
 
-# =====================================================
-# METRICS
-# =====================================================
+print("\nLoading dataset...")
 
-accuracy = metrics["accuracy"]
-precision = metrics["precision"]
-recall = metrics["recall"]
-f1 = metrics["f1"]
-cm = metrics["confusion_matrix"]
+df = pd.read_csv(DATA_PATH)
 
-st.subheader("Evaluation Metrics")
+print("Dataset Loaded Successfully")
+print("Shape :", df.shape)
 
-col1, col2, col3, col4 = st.columns(4)
+# Remove extra spaces from column names
+df.columns = df.columns.str.strip()
 
-col1.metric(
-    "Accuracy",
-    f"{accuracy*100:.2f}%"
+# Remove duplicate rows
+df = df.drop_duplicates()
+
+print("Shape After Removing Duplicates :", df.shape)
+
+# =========================================================
+# PREPROCESSING
+# =========================================================
+
+print("\nPreprocessing dataset...")
+
+# Convert TotalCharges to numeric
+if "TotalCharges" in df.columns:
+    df["TotalCharges"] = pd.to_numeric(
+        df["TotalCharges"],
+        errors="coerce"
+    )
+
+# Separate numeric and categorical columns
+numeric_columns = df.select_dtypes(
+    include=["number"]
+).columns.tolist()
+
+categorical_columns = df.select_dtypes(
+    include=["object", "string", "category"]
+).columns.tolist()
+
+# Remove target and ID columns
+if "customerID" in categorical_columns:
+    categorical_columns.remove("customerID")
+
+if "Churn" in categorical_columns:
+    categorical_columns.remove("Churn")
+
+# =========================================================
+# HANDLE MISSING VALUES
+# =========================================================
+
+print("Handling missing values...")
+
+# Numeric → Median
+for column in numeric_columns:
+
+    df[column] = df[column].fillna(
+        df[column].median()
+    )
+
+# Categorical → "missing"
+for column in categorical_columns:
+
+    df[column] = df[column].fillna(
+        "missing"
+    )
+
+print("Missing Values After Cleaning")
+
+print(df.isnull().sum())
+
+# =========================================================
+# TARGET COLUMN
+# =========================================================
+
+df["Churn"] = df["Churn"].map({
+    "No": 0,
+    "Yes": 1
+})
+
+print("\nTarget Distribution")
+
+print(df["Churn"].value_counts())
+
+# =========================================================
+# LABEL ENCODING
+# =========================================================
+
+print("\nEncoding categorical features...")
+
+encoders = {}
+
+for column in categorical_columns:
+
+    encoder = LabelEncoder()
+
+    df[column] = encoder.fit_transform(
+        df[column]
+    )
+
+    encoders[column] = encoder
+
+print("Categorical Encoding Completed")
+
+# =========================================================
+# FEATURES & TARGET
+# =========================================================
+
+X = df.drop(
+    columns=["customerID", "Churn"]
 )
 
-col2.metric(
-    "Precision",
-    f"{precision*100:.2f}%"
+y = df["Churn"]
+
+print("\nFeature Matrix Shape :", X.shape)
+print("Target Shape :", y.shape)
+
+print("\nFeature Columns")
+
+for column in X.columns:
+    print("-", column)
+
+# =========================================================
+# TRAIN TEST SPLIT
+# =========================================================
+
+print("\nSplitting dataset...")
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.20,
+    random_state=42,
+    stratify=y
 )
 
-col3.metric(
-    "Recall",
-    f"{recall*100:.2f}%"
+print("Training Samples :", X_train.shape[0])
+print("Testing Samples  :", X_test.shape[0])
+
+# =========================================================
+# FEATURE SCALING
+# =========================================================
+
+print("\nScaling numeric features...")
+
+scaler = StandardScaler()
+
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+print("Scaling Completed")
+
+# =========================================================
+# MODEL TRAINING
+# =========================================================
+
+print("\nTraining Random Forest Model...")
+
+model = RandomForestClassifier(
+    n_estimators=200,
+    max_depth=7,
+    random_state=42,
+    class_weight="balanced"
 )
 
-col4.metric(
-    "F1 Score",
-    f"{f1*100:.2f}%"
+model.fit(
+    X_train_scaled,
+    y_train
 )
 
-st.markdown("---")
+print("Model Training Completed Successfully")
 
-# =====================================================
-# CONFUSION MATRIX
-# =====================================================
+# =========================================================
+# Prediction Results
+# =========================================================
 
-st.subheader("Confusion Matrix")
+print("\nGenerating predictions...")
 
-cm_df = pd.DataFrame(
-    cm,
-    index=["Actual No Churn", "Actual Churn"],
-    columns=["Predicted No Churn", "Predicted Churn"]
+y_pred = model.predict(X_test_scaled)
+
+y_prob = model.predict_proba(X_test_scaled)[:, 1]
+
+print("Prediction Completed")
+
+# =========================================================
+# MODEL EVALUATION
+# =========================================================
+
+print("\n" + "=" * 60)
+print("MODEL PERFORMANCE")
+print("=" * 60)
+
+accuracy = accuracy_score(y_test, y_pred)
+
+precision = precision_score(
+    y_test,
+    y_pred,
+    zero_division=0
 )
 
-st.dataframe(
-    cm_df,
-    use_container_width=True,
-    hide_index=False
+recall = recall_score(
+    y_test,
+    y_pred,
+    zero_division=0
 )
 
-st.markdown("---")
+f1 = f1_score(
+    y_test,
+    y_pred,
+    zero_division=0
+)
 
-# =====================================================
+roc_auc = roc_auc_score(
+    y_test,
+    y_prob
+)
+
+cm = confusion_matrix(
+    y_test,
+    y_pred
+)
+
+report = classification_report(
+    y_test,
+    y_pred,
+    output_dict=True
+)
+
+print(f"\nAccuracy  : {accuracy:.4f}")
+print(f"Precision : {precision:.4f}")
+print(f"Recall    : {recall:.4f}")
+print(f"F1 Score  : {f1:.4f}")
+print(f"ROC AUC   : {roc_auc:.4f}")
+
+print("\nConfusion Matrix")
+print(cm)
+
+print("\nClassification Report")
+print(classification_report(y_test, y_pred))
+
+# =========================================================
 # FEATURE IMPORTANCE
-# =====================================================
-
-st.subheader("Feature Importance")
-
-X = df.drop(columns=["customerID", "Churn"])
+# =========================================================
 
 importance = pd.DataFrame({
     "Feature": X.columns,
@@ -122,36 +294,27 @@ importance = importance.sort_values(
     ascending=False
 )
 
-fig = px.bar(
-    importance,
-    x="Importance",
-    y="Feature",
-    orientation="h",
-    title="Top Features Influencing Churn"
+print("\nTop 10 Important Features")
+
+print(
+    importance.head(10)
 )
 
-fig.update_layout(
-    yaxis=dict(categoryorder="total ascending"),
-    height=600
-)
+# =========================================================
+# METRICS DICTIONARY
+# =========================================================
 
-st.plotly_chart(
-    fig,
-    use_container_width=True
-)
+metrics = {
+    "accuracy": accuracy,
+    "precision": precision,
+    "recall": recall,
+    "f1": f1,
+    "roc_auc": roc_auc,
+    "confusion_matrix": cm,
+    "classification_report": report,
+    "feature_importance": importance
+}
 
-st.markdown("---")
+print("\nEvaluation Completed Successfully")
 
-st.subheader("Feature Importance Table")
 
-importance["Importance"] = importance["Importance"].round(4)
-
-st.dataframe(
-    importance,
-    use_container_width=True,
-    hide_index=True
-)
-
-st.markdown("---")
-
-st.success("Model performance shown above is based on the test dataset used during training.")

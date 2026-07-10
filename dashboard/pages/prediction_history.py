@@ -31,7 +31,7 @@ conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()
 
 cursor.execute("""
-CREATE TABLE IF NOT EXISTS predictions(
+CREATE TABLE IF NOT EXISTS prediction_history(
 
 id INTEGER PRIMARY KEY AUTOINCREMENT,
 
@@ -55,7 +55,7 @@ conn.commit()
 # =====================================================
 
 history = pd.read_sql_query(
-    "SELECT * FROM predictions ORDER BY id DESC",
+    "SELECT * FROM prediction_history ORDER BY id DESC",
     conn
 )
 st.write(history)
@@ -67,7 +67,7 @@ st.write(history)
 col1, col2, col3 = st.columns(3)
 
 col1.metric(
-    "Total Predictions",
+    "Total prediction_history",
     len(history)
 )
 
