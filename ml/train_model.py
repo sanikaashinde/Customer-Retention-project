@@ -317,4 +317,23 @@ metrics = {
 
 print("\nEvaluation Completed Successfully")
 
+# =========================================================
+# SAVE ARTIFACTS
+# =========================================================
+
+print("\nSaving model artifacts...")
+
+joblib.dump(model, MODEL_PATH)
+joblib.dump(scaler, SCALER_PATH)
+joblib.dump(encoders, ENCODER_PATH)
+joblib.dump(metrics, METRICS_PATH)
+
+print("Artifacts saved successfully.")
+
+print(f"Model    : {MODEL_PATH}")
+print(f"Scaler   : {SCALER_PATH}")
+print(f"Encoders : {ENCODER_PATH}")
+print(f"Metrics  : {METRICS_PATH}")
+
+print("\nTraining pipeline completed successfully.")
 
