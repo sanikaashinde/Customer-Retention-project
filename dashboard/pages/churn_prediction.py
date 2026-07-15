@@ -27,9 +27,12 @@ st.write(
 BASE_DIR = Path(__file__).resolve().parents[2]
 
 DATA_PATH = BASE_DIR / "data" / "churn.csv"
+TEST_DATA_PATH = BASE_DIR / "data" / "test.csv"
+
 MODEL_PATH = BASE_DIR / "ml" / "model.pkl"
 SCALER_PATH = BASE_DIR / "ml" / "scaler.pkl"
 ENCODER_PATH = BASE_DIR / "ml" / "encoders.pkl"
+
 DB_PATH = BASE_DIR / "database" / "customer.db"
 
 # =====================================================
@@ -54,10 +57,42 @@ def load_data():
 
 model, scaler, encoders = load_model()
 
-df = load_data()
+full_df = load_data()
 
 # =====================================================
-# CUSTOMER SELECT
+# DATA SOURCE SELECTION
+# =====================================================
+
+st.subheader("📂 Select Data Source")
+
+source = st.radio(
+    "Choose Dataset",
+    (
+        "Full Dataset",
+        "Test Dataset Only"
+    ),
+    horizontal=True
+)
+
+if source == "Full Dataset":
+
+    df = full_df
+
+else:
+
+    if TEST_DATA_PATH.exists():
+
+        df = pd.read_csv(TEST_DATA_PATH)
+
+    else:
+
+        st.error(
+            "test.csv not found. Please run ml/train_model.py first."
+        )
+        st.stop()
+
+# =====================================================
+# CUSTOMER SELECTION
 # =====================================================
 
 customer_id = st.selectbox(
@@ -87,8 +122,15 @@ with c2:
 
 with c3:
 
-    st.metric("Monthly Charges", f"₹ {customer['MonthlyCharges']}")
-    st.metric("Total Charges", f"₹ {customer['TotalCharges']}")
+    st.metric(
+        "Monthly Charges",
+        f"₹ {customer['MonthlyCharges']}"
+    )
+
+    st.metric(
+        "Total Charges",
+        f"₹ {customer['TotalCharges']}"
+    )
 
 st.markdown("---")
 
@@ -96,7 +138,14 @@ st.markdown("---")
 # PREDICT BUTTON
 # =====================================================
 
-if st.button("🚀 Predict Churn", use_container_width=True):
+if st.button(
+    "🚀 Predict Churn",
+    use_container_width=True
+):
+   
+    # =====================================================
+    # PREPARE INPUT
+    # =====================================================
 
     input_df = customer.to_frame().T.copy()
 
@@ -114,19 +163,30 @@ if st.button("🚀 Predict Churn", use_container_width=True):
         input_df["TotalCharges"].median()
     )
 
-    # Encode categorical columns
+    # =====================================================
+    # ENCODE CATEGORICAL FEATURES
+    # =====================================================
 
     for col, encoder in encoders.items():
 
         if col in input_df.columns:
 
-            input_df[col] = encoder.transform(
-                input_df[col]
-            )
+            # Encode only if values are still strings
+            if input_df[col].dtype == object:
 
-    # Scale
+                input_df[col] = encoder.transform(
+                    input_df[col]
+                )
+
+    # =====================================================
+    # SCALE FEATURES
+    # =====================================================
 
     input_scaled = scaler.transform(input_df)
+
+    # =====================================================
+    # PREDICTION
+    # =====================================================
 
     prediction = model.predict(input_scaled)[0]
 
@@ -134,8 +194,14 @@ if st.button("🚀 Predict Churn", use_container_width=True):
         input_scaled
     )[0][1]
 
+    prediction_text = (
+        "Churn"
+        if prediction == 1
+        else "No Churn"
+    )
+
     # =====================================================
-    # Risk Level
+    # RISK LEVEL
     # =====================================================
 
     if probability >= 0.80:
@@ -158,66 +224,33 @@ if st.button("🚀 Predict Churn", use_container_width=True):
 
     cursor = conn.cursor()
 
-    cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='prediction_history'"
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS prediction_history(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customerID TEXT,
+        prediction TEXT,
+        probability REAL,
+        risk TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
+    """)
 
-    table_exists = cursor.fetchone()
-
-      # =====================================================
-    # DATABASE SCHEMA CHECK
-    # =====================================================
-
-    if table_exists:
-
-        cursor.execute("PRAGMA table_info(prediction_history)")
-        columns = [col[1] for col in cursor.fetchall()]
-
-        if "customerID" not in columns:
-
-            cursor.execute("DROP TABLE prediction_history")
-
-            cursor.execute("""
-            CREATE TABLE prediction_history(
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                customerID TEXT,
-                prediction TEXT,
-                probability REAL,
-                risk TEXT,
-                prediction_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """)
-
-            conn.commit()
-
-    else:
-
-        cursor.execute("""
-        CREATE TABLE prediction_history(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            customerID TEXT,
-            prediction TEXT,
-            probability REAL,
-            risk TEXT,
-            prediction_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """)
-
-        conn.commit()
-
-    # =====================================================
-    # SAVE PREDICTION
-    # =====================================================
+    conn.commit()
 
     cursor.execute(
         """
         INSERT INTO prediction_history
-        (customerID, prediction, probability, risk)
+        (
+            customerID,
+            prediction,
+            probability,
+            risk
+        )
         VALUES (?, ?, ?, ?)
         """,
         (
             customer_id,
-            "Churn" if prediction == 1 else "No Churn",
+            prediction_text,
             float(probability),
             risk
         )
@@ -227,7 +260,7 @@ if st.button("🚀 Predict Churn", use_container_width=True):
     conn.close()
 
     # =====================================================
-    # RESULT
+    # PREDICTION RESULT
     # =====================================================
 
     st.subheader("📈 Prediction Result")
@@ -239,13 +272,24 @@ if st.button("🚀 Predict Churn", use_container_width=True):
 
     st.progress(float(probability))
 
-    if prediction == 1:
+    result_col1, result_col2 = st.columns(2)
 
-        st.error("❌ Customer Will Churn")
+    with result_col1:
 
-    else:
+        if prediction == 1:
 
-        st.success("✅ Customer Will Stay")
+            st.error("❌ Customer Will Churn")
+
+        else:
+
+            st.success("✅ Customer Will Stay")
+
+    with result_col2:
+
+        st.metric(
+            "Risk Level",
+            risk
+        )
 
     # =====================================================
     # RISK ANALYSIS
@@ -260,7 +304,14 @@ if st.button("🚀 Predict Churn", use_container_width=True):
         st.error("🔴 High Risk Customer")
 
         st.warning(
-            "Offer retention campaigns, discounts and proactive customer support immediately."
+            """
+            Recommended Actions
+
+            • Contact customer immediately
+            • Offer special discount
+            • Assign retention executive
+            • Provide personalized support
+            """
         )
 
     elif risk == "Medium":
@@ -268,7 +319,13 @@ if st.button("🚀 Predict Churn", use_container_width=True):
         st.warning("🟠 Medium Risk Customer")
 
         st.info(
-            "Recommend promotional offers and periodic follow-up communication."
+            """
+            Recommended Actions
+
+            • Send promotional offers
+            • Follow up via email/SMS
+            • Recommend suitable plans
+            """
         )
 
     else:
@@ -276,8 +333,45 @@ if st.button("🚀 Predict Churn", use_container_width=True):
         st.success("🟢 Low Risk Customer")
 
         st.info(
-            "Customer appears loyal. Continue regular engagement and reward programs."
+            """
+            Recommended Actions
+
+            • Customer is loyal
+            • Continue engagement
+            • Reward through loyalty programs
+            """
         )
+
+    # =====================================================
+    # CUSTOMER INFORMATION
+    # =====================================================
+
+    st.markdown("---")
+
+    st.subheader("📋 Prediction Summary")
+
+    summary = pd.DataFrame(
+        {
+            "Field": [
+                "Customer ID",
+                "Prediction",
+                "Probability",
+                "Risk Level"
+            ],
+            "Value": [
+                customer_id,
+                prediction_text,
+                f"{probability*100:.2f}%",
+                risk
+            ]
+        }
+    )
+
+    st.dataframe(
+        summary,
+        use_container_width=True,
+        hide_index=True
+    )
 
     # =====================================================
     # ACTUAL LABEL
@@ -285,12 +379,25 @@ if st.button("🚀 Predict Churn", use_container_width=True):
 
     st.markdown("---")
 
-    st.subheader("📋 Actual Dataset Label")
+    st.subheader("📌 Actual Dataset Label")
 
     if customer["Churn"] == "Yes":
 
-        st.error("Actual Label: Customer Churned")
+        st.error("Actual Label : Customer Churned")
 
     else:
 
-        st.success("Actual Label: Customer Did Not Churn")  
+        st.success("Actual Label : Customer Did Not Churn")
+
+    # =====================================================
+    # MODEL CONFIDENCE
+    # =====================================================
+
+    st.markdown("---")
+
+    st.subheader("🎯 Model Confidence")
+
+    st.info(
+        f"The model predicts **{prediction_text}** "
+        f"with **{probability*100:.2f}%** confidence."
+    )

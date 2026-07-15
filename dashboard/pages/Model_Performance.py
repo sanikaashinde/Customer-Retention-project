@@ -38,7 +38,6 @@ model = joblib.load(MODEL_PATH)
 metrics = joblib.load(METRICS_PATH)
 df = pd.read_csv(DATA_PATH)
 
-# Remove columns not used for feature importance
 X = df.drop(columns=["customerID", "Churn"])
 
 # =====================================================
@@ -48,29 +47,35 @@ X = df.drop(columns=["customerID", "Churn"])
 accuracy = metrics["accuracy"]
 precision = metrics["precision"]
 recall = metrics["recall"]
-f1 = metrics["f1"]
+f1 = metrics["f1_score"]
+roc_auc = metrics["roc_auc"]
 cm = metrics["confusion_matrix"]
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 
 col1.metric(
     "Accuracy",
-    f"{accuracy:.2%}"
+    f"{accuracy*100:.2f}%"
 )
 
 col2.metric(
     "Precision",
-    f"{precision:.2%}"
+    f"{precision*100:.2f}%"
 )
 
 col3.metric(
     "Recall",
-    f"{recall:.2%}"
+    f"{recall*100:.2f}%"
 )
 
 col4.metric(
     "F1 Score",
-    f"{f1:.2%}"
+    f"{f1*100:.2f}%"
+)
+
+col5.metric(
+    "ROC AUC",
+    f"{roc_auc*100:.2f}%"
 )
 
 st.markdown("---")
@@ -83,14 +88,19 @@ st.subheader("Confusion Matrix")
 
 cm_df = pd.DataFrame(
     cm,
-    index=["Actual No Churn", "Actual Churn"],
-    columns=["Predicted No Churn", "Predicted Churn"]
+    index=[
+        "Actual No Churn",
+        "Actual Churn"
+    ],
+    columns=[
+        "Predicted No Churn",
+        "Predicted Churn"
+    ]
 )
 
 st.dataframe(
     cm_df,
-    use_container_width=True,
-    hide_index=False
+    use_container_width=True
 )
 
 st.markdown("---")
@@ -161,17 +171,19 @@ summary = pd.DataFrame({
         "Accuracy",
         "Precision",
         "Recall",
-        "F1 Score"
+        "F1 Score",
+        "ROC AUC"
     ],
     "Value": [
         "Random Forest Classifier",
         5634,
         1409,
         len(X.columns),
-        f"{accuracy:.2%}",
-        f"{precision:.2%}",
-        f"{recall:.2%}",
-        f"{f1:.2%}"
+        f"{accuracy*100:.2f}%",
+        f"{precision*100:.2f}%",
+        f"{recall*100:.2f}%",
+        f"{f1*100:.2f}%",
+        f"{roc_auc*100:.2f}%"
     ]
 })
 

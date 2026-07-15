@@ -35,6 +35,10 @@ ENCODER_PATH = BASE_DIR / "ml" / "encoders.pkl"
 
 METRICS_PATH = BASE_DIR / "ml" / "metrics.pkl"
 
+# Mentor Requirement
+TRAIN_DATA_PATH = BASE_DIR / "data" / "train.csv"
+TEST_DATA_PATH = BASE_DIR / "data" / "test.csv"
+
 print("=" * 60)
 print("CUSTOMER CHURN MODEL TRAINING")
 print("=" * 60)
@@ -46,14 +50,13 @@ print("=" * 60)
 print("\nLoading dataset...")
 
 df = pd.read_csv(DATA_PATH)
+original_df = df.copy()
 
 print("Dataset Loaded Successfully")
 print("Shape :", df.shape)
 
-# Remove extra spaces from column names
 df.columns = df.columns.str.strip()
 
-# Remove duplicate rows
 df = df.drop_duplicates()
 
 print("Shape After Removing Duplicates :", df.shape)
@@ -64,14 +67,12 @@ print("Shape After Removing Duplicates :", df.shape)
 
 print("\nPreprocessing dataset...")
 
-# Convert TotalCharges to numeric
 if "TotalCharges" in df.columns:
     df["TotalCharges"] = pd.to_numeric(
         df["TotalCharges"],
         errors="coerce"
     )
 
-# Separate numeric and categorical columns
 numeric_columns = df.select_dtypes(
     include=["number"]
 ).columns.tolist()
@@ -80,7 +81,6 @@ categorical_columns = df.select_dtypes(
     include=["object", "string", "category"]
 ).columns.tolist()
 
-# Remove target and ID columns
 if "customerID" in categorical_columns:
     categorical_columns.remove("customerID")
 
@@ -93,16 +93,12 @@ if "Churn" in categorical_columns:
 
 print("Handling missing values...")
 
-# Numeric → Median
 for column in numeric_columns:
-
     df[column] = df[column].fillna(
         df[column].median()
     )
 
-# Categorical → "missing"
 for column in categorical_columns:
-
     df[column] = df[column].fillna(
         "missing"
     )
@@ -180,6 +176,21 @@ print("Training Samples :", X_train.shape[0])
 print("Testing Samples  :", X_test.shape[0])
 
 # =========================================================
+# SAVE TRAIN & TEST DATASETS (Mentor Requirement)
+# =========================================================
+
+print("\nSaving reusable train/test datasets...")
+
+train_original = original_df.loc[X_train.index].copy()
+test_original = original_df.loc[X_test.index].copy()
+
+train_original.to_csv(TRAIN_DATA_PATH, index=False)
+test_original.to_csv(TEST_DATA_PATH, index=False)
+
+print("Train dataset saved :", TRAIN_DATA_PATH)
+print("Test dataset saved  :", TEST_DATA_PATH)
+
+# =========================================================
 # FEATURE SCALING
 # =========================================================
 
@@ -213,14 +224,16 @@ model.fit(
 print("Model Training Completed Successfully")
 
 # =========================================================
-# Prediction Results
+# PREDICTIONS
 # =========================================================
 
 print("\nGenerating predictions...")
 
 y_pred = model.predict(X_test_scaled)
 
-y_prob = model.predict_proba(X_test_scaled)[:, 1]
+y_prob = model.predict_proba(
+    X_test_scaled
+)[:, 1]
 
 print("Prediction Completed")
 
@@ -232,7 +245,10 @@ print("\n" + "=" * 60)
 print("MODEL PERFORMANCE")
 print("=" * 60)
 
-accuracy = accuracy_score(y_test, y_pred)
+accuracy = accuracy_score(
+    y_test,
+    y_pred
+)
 
 precision = precision_score(
     y_test,
@@ -278,7 +294,10 @@ print("\nConfusion Matrix")
 print(cm)
 
 print("\nClassification Report")
-print(classification_report(y_test, y_pred))
+print(classification_report(
+    y_test,
+    y_pred
+))
 
 # =========================================================
 # FEATURE IMPORTANCE
@@ -308,7 +327,11 @@ metrics = {
     "accuracy": accuracy,
     "precision": precision,
     "recall": recall,
+
+    # Keep both keys for compatibility with all dashboard pages
     "f1": f1,
+    "f1_score": f1,
+
     "roc_auc": roc_auc,
     "confusion_matrix": cm,
     "classification_report": report,
@@ -318,15 +341,30 @@ metrics = {
 print("\nEvaluation Completed Successfully")
 
 # =========================================================
-# SAVE ARTIFACTS
+# SAVE MODEL ARTIFACTS
 # =========================================================
 
 print("\nSaving model artifacts...")
 
-joblib.dump(model, MODEL_PATH)
-joblib.dump(scaler, SCALER_PATH)
-joblib.dump(encoders, ENCODER_PATH)
-joblib.dump(metrics, METRICS_PATH)
+joblib.dump(
+    model,
+    MODEL_PATH
+)
+
+joblib.dump(
+    scaler,
+    SCALER_PATH
+)
+
+joblib.dump(
+    encoders,
+    ENCODER_PATH
+)
+
+joblib.dump(
+    metrics,
+    METRICS_PATH
+)
 
 print("Artifacts saved successfully.")
 
@@ -335,5 +373,6 @@ print(f"Scaler   : {SCALER_PATH}")
 print(f"Encoders : {ENCODER_PATH}")
 print(f"Metrics  : {METRICS_PATH}")
 
-print("\nTraining pipeline completed successfully.")
-
+print("\n" + "=" * 60)
+print("TRAINING PIPELINE COMPLETED SUCCESSFULLY")
+print("=" * 60)

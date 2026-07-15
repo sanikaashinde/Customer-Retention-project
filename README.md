@@ -1,30 +1,31 @@
 # Customer Churn Prediction System
 
-A Machine Learning based Customer Churn Prediction System built using **Python, Scikit-learn, Streamlit, SQLite, and Pandas**.
+A Machine Learning-based **Customer Churn Prediction System** built using **Python, Scikit-learn, Streamlit, SQLite, Pandas, and Joblib**.
 
-The project predicts whether a telecom customer is likely to churn based on customer demographics, service usage, billing information, and contract details. It also provides an interactive Streamlit dashboard for predictions, model evaluation, and prediction history.
+This project predicts whether a telecom customer is likely to **churn (leave the service)** based on customer demographics, service usage, billing information, and contract details. It also provides an interactive Streamlit dashboard for customer predictions, model evaluation, business insights, and prediction history.
 
 ---
 
 # Features
 
-- Customer Churn Prediction using Machine Learning
-- End-to-End Data Preprocessing Pipeline
-- Missing Value Handling
-- Categorical Feature Encoding
-- Feature Scaling using StandardScaler
-- Random Forest Classification Model
-- Model Performance Dashboard
-- Prediction History using SQLite
-- Interactive Streamlit Dashboard
-- Reproducible Training Pipeline
-- Saved Model Artifacts for Deployment
+* Customer Churn Prediction using Machine Learning
+* End-to-End Data Preprocessing Pipeline
+* Missing Value Handling
+* Duplicate Record Removal
+* Categorical Feature Encoding
+* Feature Scaling using StandardScaler
+* Random Forest Classification Model
+* Dynamic Model Performance Dashboard
+* Prediction History using SQLite
+* Interactive Streamlit Dashboard
+* Reproducible Training Pipeline
+* Saved Model Artifacts for Deployment
 
 ---
 
 # Project Structure
 
-```
+```text
 Customer_Retention_Project/
 │
 ├── README.md
@@ -40,7 +41,9 @@ Customer_Retention_Project/
 │       └── Model_Performance.py
 │
 ├── data/
-│   └── churn.csv
+│   ├── churn.csv
+│   ├── train.csv
+│   └── test.csv
 │
 ├── ml/
 │   ├── train_model.py
@@ -66,26 +69,32 @@ Customer_Retention_Project/
 
 # Dataset
 
-Dataset Used:
+**Dataset Used**
 
-**Telco Customer Churn Dataset**
+IBM Telco Customer Churn Dataset
 
-The dataset contains customer demographic, subscription, and billing information including:
+The dataset contains customer demographic, subscription, billing, and service information, including:
 
-- Gender
-- Senior Citizen
-- Partner
-- Dependents
-- Tenure
-- Phone Service
-- Internet Service
-- Online Security
-- Tech Support
-- Contract Type
-- Payment Method
-- Monthly Charges
-- Total Charges
-- Churn (Target Variable)
+* Gender
+* Senior Citizen
+* Partner
+* Dependents
+* Tenure
+* Phone Service
+* Multiple Lines
+* Internet Service
+* Online Security
+* Online Backup
+* Device Protection
+* Tech Support
+* Streaming TV
+* Streaming Movies
+* Contract Type
+* Paperless Billing
+* Payment Method
+* Monthly Charges
+* Total Charges
+* Churn (Target Variable)
 
 ---
 
@@ -93,40 +102,40 @@ The dataset contains customer demographic, subscription, and billing information
 
 The complete ML pipeline performs:
 
-- Data Loading
-- Duplicate Removal
-- Missing Value Handling
-- Numerical Feature Scaling
-- Categorical Feature Encoding
-- Train/Test Split
-- Random Forest Model Training
-- Model Evaluation
-- Artifact Saving
+* Data Loading
+* Duplicate Removal
+* Missing Value Handling
+* Numerical Feature Scaling
+* Categorical Feature Encoding
+* Train-Test Split (80:20)
+* Random Forest Model Training
+* Model Evaluation
+* Model Artifact Saving
 
-Artifacts generated:
+Generated artifacts:
 
-- model.pkl
-- scaler.pkl
-- encoders.pkl
-- metrics.pkl
+* `model.pkl`
+* `scaler.pkl`
+* `encoders.pkl`
+* `metrics.pkl`
 
 ---
 
 # Model
 
-Algorithm Used
+**Algorithm**
 
-**Random Forest Classifier**
+Random Forest Classifier
 
-Random State:
+**Random State**
 
-```
+```text
 42
 ```
 
-Train-Test Split:
+**Train-Test Split**
 
-```
+```text
 80 : 20
 ```
 
@@ -134,49 +143,52 @@ Train-Test Split:
 
 # Model Performance
 
-Current model performance:
+The latest trained Random Forest model achieved the following performance on the test dataset.
 
-| Metric | Value |
-|---------|---------|
-| Accuracy | 79.63% |
-| Precision | 66.17% |
-| Recall | 47.18% |
-| F1 Score | 55.09% |
+| Metric    |  Value |
+| --------- | -----: |
+| Accuracy  | 75.73% |
+| Precision | 52.95% |
+| Recall    | 76.74% |
+| F1 Score  | 62.66% |
+| ROC AUC   | 84.25% |
 
-These metrics are automatically generated during model training and stored in:
+These metrics are automatically generated during model training and saved in:
 
-```
+```text
 ml/metrics.pkl
 ```
+
+The Streamlit dashboard loads these metrics dynamically from `ml/metrics.pkl`, ensuring that the displayed values always match the latest trained model.
 
 ---
 
 # Database
 
-SQLite database is used to store prediction history.
+SQLite is used to store prediction history.
 
-Database:
+**Database**
 
-```
+```text
 database/customer.db
 ```
 
-Prediction table:
+**Prediction Table**
 
-```
+```text
 prediction_history
 ```
 
-Stored fields include:
+Stored columns:
 
-- id
-- customerID
-- prediction
-- probability
-- risk
-- created_at
+* id
+* customerID
+* prediction
+* probability
+* risk
+* created_at
 
-Database can be recreated anytime using:
+Recreate the database anytime using:
 
 ```bash
 python database/init_db.py
@@ -186,19 +198,19 @@ python database/init_db.py
 
 # Installation
 
-Clone Repository
+Clone the repository:
 
 ```bash
 git clone https://github.com/sanikaashinde/Customer-Retention-project.git
 ```
 
-Move into project
+Navigate to the project directory:
 
 ```bash
 cd Customer_Retention_Project
 ```
 
-Install dependencies
+Install dependencies:
 
 ```bash
 pip install -r requirements.txt
@@ -214,19 +226,25 @@ Run:
 python ml/train_model.py
 ```
 
-This automatically:
+The training pipeline automatically:
 
-- Loads the dataset
-- Cleans data
-- Encodes categorical features
-- Scales numerical features
-- Trains the Random Forest model
-- Evaluates performance
-- Saves model artifacts
+* Loads the dataset
+* Removes duplicate records
+* Handles missing values
+* Encodes categorical features
+* Splits the dataset into training and testing sets
+* Saves `train.csv` and `test.csv`
+* Applies feature scaling
+* Trains the Random Forest model
+* Evaluates model performance
+* Saves model artifacts
 
 Generated files:
 
-```
+```text
+data/train.csv
+data/test.csv
+
 ml/model.pkl
 ml/scaler.pkl
 ml/encoders.pkl
@@ -243,28 +261,30 @@ Run:
 python database/init_db.py
 ```
 
-This recreates the prediction history table if required.
+This recreates the `prediction_history` table if required.
 
 ---
 
 # Run Dashboard
 
+Launch the Streamlit application:
+
 ```bash
 streamlit run dashboard/app.py
 ```
 
-Dashboard contains:
+Dashboard modules:
 
-- Dashboard Overview
-- Churn Prediction
-- Prediction History
-- Model Performance
+* Dashboard Overview
+* Churn Prediction
+* Prediction History
+* Model Performance
 
 ---
 
 # Smoke Test
 
-To verify that the saved model loads correctly:
+Verify that the trained model and preprocessing artifacts load successfully:
 
 ```bash
 python test_smoke.py
@@ -274,73 +294,75 @@ python test_smoke.py
 
 # Screenshots
 
-Application screenshots are available inside the **screenshots/** folder.
+Application screenshots are available in the `screenshots/` folder.
 
 Included screenshots:
 
-- Application Home
-- Dashboard
-- Churn Prediction
-- Prediction Results
-- Prediction History
-- Model Performance
+* Application Home
+* Dashboard Overview
+* Churn Prediction
+* Prediction Result
+* Prediction History
+* Model Performance
 
 ---
 
 # Technologies Used
 
-- Python
-- Streamlit
-- Scikit-learn
-- Pandas
-- NumPy
-- SQLite
-- Joblib
-- Plotly
+* Python
+* Streamlit
+* Scikit-learn
+* Pandas
+* NumPy
+* SQLite
+* Joblib
+* Plotly
 
 ---
 
 # Requirements
 
-Important package versions:
+Recommended package versions:
 
-```
-scikit-learn==1.2.2
-pandas==1.5.3
-numpy==1.24.3
-streamlit==1.23.1
-joblib==1.2.0
-plotly==5.15.0
-sqlalchemy==1.4.49
+```text
+streamlit==1.49.0
+pandas==2.3.1
+numpy==2.3.1
+scikit-learn==1.7.1
+joblib==1.5.1
+plotly==6.2.0
+sqlalchemy==2.0.41
+matplotlib==3.10.3
 ```
 
 ---
 
 # Project Highlights
 
-- End-to-End Machine Learning Pipeline
-- Reproducible Model Training
-- Modular Project Structure
-- Streamlit Dashboard
-- SQLite Integration
-- Prediction History Tracking
-- Model Performance Visualization
-- Deployment Ready
+* End-to-End Machine Learning Pipeline
+* Reproducible Model Training
+* Automatic Train/Test Dataset Generation
+* Dynamic Model Performance Loading
+* Modular Project Structure
+* Interactive Streamlit Dashboard
+* SQLite Integration
+* Prediction History Tracking
+* Deployment Ready
 
 ---
 
 # Recent Improvements
 
-The project was updated to improve reproducibility and maintainability.
-
 Major updates include:
 
-- Replaced old RFM-based implementation with a true Customer Churn Prediction pipeline.
-- Added a reproducible `train_model.py` script for end-to-end model training.
-- Saved preprocessing artifacts (`model.pkl`, `scaler.pkl`, `encoders.pkl`, and `metrics.pkl`).
-- Rebuilt the SQLite database with a clean `prediction_history` table.
-- Removed obsolete files, duplicate resources, and merge-conflict artifacts.
-- Updated the Streamlit dashboard to use the latest trained model and database schema.
+* Replaced the previous RFM-based implementation with a complete Customer Churn Prediction pipeline.
+* Added an end-to-end reproducible `train_model.py` training script.
+* Automatically generates `train.csv` and `test.csv` during training.
+* Saves preprocessing artifacts (`model.pkl`, `scaler.pkl`, `encoders.pkl`, and `metrics.pkl`).
+* Dashboard now loads evaluation metrics dynamically from `metrics.pkl`.
+* Rebuilt the SQLite database with the `prediction_history` table.
+* Removed obsolete files, duplicate resources, and merge-conflict artifacts.
+* Updated the Streamlit dashboard to use the latest trained model and database schema.
 
 ---
 
